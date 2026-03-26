@@ -1,0 +1,284 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(cuid())
+  email      String      @unique
+  name       String
+  role       UserRole    @default(MANAGER)
+  department String?
+  createdAt  DateTime    @default(now())
+  approvals  ActionLog[]
+}
+
+enum UserRole {
+  MANAGER
+  DIRECTOR
+  CFO
+  ADMIN
+}
+
+model AnalysisSession {
+  id           String           @id @default(cuid())
+  createdAt    DateTime         @default(now())
+  status       SessionStatus    @default(PENDING)
+  sourceType   SourceType
+  fileName     String?
+  totalRecords Int              @default(0)
+  totalSpend   Float            @default(0)
+  totalWaste   Float            @default(0)
+  overspendPct Float            @default(0)
+  findings     Finding[]
+  expenses     Expense[]
+  forecasts    ForecastRecord[]
+}
+
+enum SessionStatus {
+  PENDING
+  ANALYZING
+  COMPLETE
+  FAILED
+}
+
+enum SourceType {
+  CSV
+  PDF_BANK_STATEMENT
+  CARD_FEED
+  MANUAL
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  sessionId   String
+  session     AnalysisSession @relation(fields: [sessionId], references: [id])
+  date        DateTime
+  vendor      String
+  amount      Float
+  category    String
+  department  String
+  description String?
+  riskScore   Float           @default(0)
+  isAnomaly   Boolean         @default(false)
+  isFrozen    Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+}
+
+model Finding {
+  id                   String          @id @default(cuid())
+  sessionId            String
+  session              AnalysisSession @relation(fields: [sessionId], references: [id])
+  title                String
+  description          String
+  findingType          FindingType
+  severity             Severity
+  riskScore            Float
+  baselineAmount       Float
+  anomalyAmount        Float
+  deltaAmount          Float
+  projectedAnnualWaste Float
+  confidenceScore      Float
+  calculationMethod    String
+  calculationSteps     Json
+  affectedVendor       String?
+  affectedDepartment   String?
+  affectedCategory     String?
+  actions              ActionLog[]
+  createdAt            DateTime        @default(now())
+}
+
+enum FindingType {
+  SPEND_SPIKE
+  DUPLICATE_VENDOR
+  BUDGET_OVERRUN
+  UNUSUAL_PATTERN
+  VENDOR_CONCENTRATION
+  POLICY_VIOLATION
+  UNDERUTILIZED_LICENSE
+  SLA_RISK
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model ActionLog {
+  id                     String       @id @default(cuid())
+  findingId              String
+  finding                Finding      @relation(fields: [findingId], references: [id])
+  title                  String
+  description            String
+  actionType             ActionType
+  status                 ActionStatus @default(PENDING)
+  priority               Int          @default(0)
+  approvalTier           ApprovalTier
+  estimatedSavingMonthly Float
+  estimatedSavingAnnual  Float
+  dollarThreshold        Float
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  approvedAt             DateTime?
+  approvedById           String?
+  approvedBy             User?        @relation(fields: [approvedById], references: [id])
+  reasonCode             ReasonCode?
+  reasonNote             String?
+  executedAt             DateTime?
+  executionResult        Json?
+  slackMessageTs         String?
+  ticketId               String?
+  simulation             Simulation?
+  roiRecord              ROIRecord?
+}
+
+enum ActionType {
+  VENDOR_FREEZE
+  SLACK_ALERT
+  TICKET_CREATE
+  BUDGET_ADJUSTMENT
+  LICENSE_REDUCTION
+}
+
+enum ActionStatus {
+  PENDING
+  AUTO_EXECUTED
+  AWAITING_MANAGER
+  AWAITING_DIRECTOR
+  AWAITING_CFO
+  APPROVED
+  EXECUTED
+  REJECTED
+  DELEGATED
+}
+
+enum PolicyCondition {
+  SINGLE_TRANSACTION
+  MONTHLY_TOTAL
+  VENDOR_NOT_APPROVED
+}
+
+enum PolicyAction {
+  FLAG
+  ALERT
+  BLOCK
+  AUTO_REJECT
+}
+
+model Policy {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  condition   PolicyCondition
+  field       String
+  operator    String
+  threshold   Float?
+  listValues  String[]
+  action      PolicyAction
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  violations  PolicyViolation[]
+}
+
+model PolicyViolation {
+  id         String   @id @default(cuid())
+  policyId   String
+  policy     Policy   @relation(fields: [policyId], references: [id])
+  expenseId  String
+  message    String
+  amount     Float
+  detectedAt DateTime @default(now())
+}
+
+model AgentReasoning {
+  id          String   @id @default(cuid())
+  findingId   String   @unique
+  steps       Json
+  eli5Summary String   @default("")
+  createdAt   DateTime @default(now())
+}
+
+model LiveFeedEvent {
+  id         String   @id @default(cuid())
+  sessionId  String
+  vendor     String
+  amount     Float
+  department String
+  category   String
+  isAnomaly  Boolean  @default(false)
+  riskScore  Float    @default(0)
+  receivedAt DateTime @default(now())
+}
+
+enum ApprovalTier {
+  AUTO
+  MANAGER
+  DIRECTOR
+  CFO
+}
+
+enum ReasonCode {
+  APPROVED_SAVINGS_VERIFIED
+  REJECTED_BUDGET_CONSTRAINTS
+  REJECTED_VENDOR_CONTRACT
+  REJECTED_INSUFFICIENT_EVIDENCE
+  REJECTED_ESCALATED
+  DELEGATED_TO_DEPARTMENT
+}
+
+model Simulation {
+  id                  String    @id @default(cuid())
+  actionLogId         String    @unique
+  action              ActionLog @relation(fields: [actionLogId], references: [id])
+  scenarioName        String
+  baselineMonthlyData Json
+  projectedData       Json
+  assumptionNotes     String
+  projectedSaving3m   Float
+  projectedSaving12m  Float
+  breakEvenMonths     Float
+  createdAt           DateTime  @default(now())
+}
+
+model ForecastRecord {
+  id             String          @id @default(cuid())
+  sessionId      String
+  session        AnalysisSession @relation(fields: [sessionId], references: [id])
+  forecastMonth  DateTime
+  predictedSpend Float
+  predictedWaste Float
+  riskCategory   String
+  alertMessage   String
+  confidence     Float
+  isAlert        Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+}
+
+model ROIRecord {
+  id              String    @id @default(cuid())
+  actionLogId     String    @unique
+  action          ActionLog @relation(fields: [actionLogId], references: [id])
+  predictedSaving Float
+  actualSaving    Float
+  accuracy        Float
+  measuredAt      DateTime  @default(now())
+  periodStart     DateTime
+  periodEnd       DateTime
+  calculationNote String
+}
+
+model TicketLog {
+  id           String   @id @default(cuid())
+  ticketId     String   @unique
+  actionLogId  String
+  title        String
+  status       String   @default("OPEN")
+  assigneeDept String?
+  createdAt    DateTime @default(now())
+}

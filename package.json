@@ -1,0 +1,47 @@
+{
+  "name": "finci",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0",
+    "@slack/webhook": "^7",
+    "chart.js": "^4",
+    "chartjs-plugin-annotation": "^3",
+    "csv-parse": "^5",
+    "date-fns": "^3",
+    "lucide-react": "^0.400.0",
+    "next": "14.2.0",
+    "next-auth": "^4",
+    "nodemailer": "^7",
+    "openai": "^4",
+    "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.15",
+    "pptxgenjs": "^4.0.1",
+    "react": "^18",
+    "react-chartjs-2": "^5",
+    "react-dom": "^18",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/nodemailer": "^6",
+    "@types/pdf-parse": "^1",
+    "@types/pdfkit": "^0.13",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10",
+    "postcss": "^8",
+    "prisma": "5.22.0",
+    "tailwindcss": "^3",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}

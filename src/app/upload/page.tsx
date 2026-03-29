@@ -33,6 +33,7 @@ export default function UploadPage() {
       const data = await res.json() as UploadResult & { error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to load card feed')
       setUploadResult(data)
+      window.localStorage.setItem('finci_session_id', data.sessionId)
       setUploadStatus('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -51,6 +52,7 @@ export default function UploadPage() {
       const data = await res.json() as UploadResult & { error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Upload failed')
       setUploadResult(data)
+      window.localStorage.setItem('finci_session_id', data.sessionId)
       setUploadStatus('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')

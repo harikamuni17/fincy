@@ -605,6 +605,93 @@ async function main() {
     },
   })
 
+  // ─── Scenario 4: FintechPulse Inc (Payments) ───────────────────────────────
+  const session4 = await prisma.analysisSession.create({
+    data: {
+      status: SessionStatus.COMPLETE,
+      sourceType: SourceType.CSV,
+      fileName: 'fintechpulse_payments_q1.csv',
+      totalRecords: 720,
+      totalSpend: 3600000,
+      totalWaste: 900000,
+      overspendPct: 25,
+    },
+  })
+
+  const paymentsVendors = [
+    { vendor: 'PayFast Payments', category: 'Payments', dept: 'Finance', normal: 150000 },
+    { vendor: 'CloudGuard Security', category: 'Security', dept: 'IT', normal: 62000 },
+    { vendor: 'FleetOne Transport', category: 'Logistics', dept: 'Operations', normal: 54000 },
+    { vendor: 'PaperTrail Supplies', category: 'Office', dept: 'Admin', normal: 22000 },
+  ]
+
+  for (let mi = 0; mi < 3; mi++) {
+    const month = months[mi]
+    for (const v of paymentsVendors) {
+      let amount = v.normal
+      if (v.vendor === 'PayFast Payments' && mi === 2) amount = Math.round(v.normal * 2.5)
+      if (v.vendor === 'CloudGuard Security' && mi === 2) amount = v.normal + 28000
+      if (v.vendor === 'FleetOne Transport' && mi === 2) amount = Math.round(v.normal * 1.8)
+
+      await prisma.expense.create({
+        data: {
+          sessionId: session4.id,
+          date: month,
+          vendor: v.vendor,
+          amount,
+          category: v.category,
+          department: v.dept,
+          description: `${v.vendor} invoice`,
+          isAnomaly: mi === 2 && ['PayFast Payments', 'CloudGuard Security', 'FleetOne Transport'].includes(v.vendor),
+        },
+      })
+    }
+  }
+
+  const f8 = await prisma.finding.create({
+    data: {
+      sessionId: session4.id,
+      title: 'PayFast Settlement Fees Spike — Finance Impact',
+      description:
+        'PayFast Payments settlement fees jumped 150% in March compared to the prior two months, driven by an unexpected surcharge on high-volume transactions. Review the payment routing terms immediately.',
+      findingType: 'BUDGET_OVERRUN',
+      severity: 'HIGH',
+      riskScore: 0.89,
+      baselineAmount: 150000,
+      anomalyAmount: 375000,
+      deltaAmount: 225000,
+      projectedAnnualWaste: 2700000,
+      confidenceScore: 0.89,
+      calculationMethod: 'fee spike trend analysis',
+      calculationSteps: [
+        { step: 'baseline_avg', value: 150000, unit: 'INR', explanation: 'Average PayFast fees over Jan-Feb: ₹1,50,000' },
+        { step: 'current_value', value: 375000, unit: 'INR', explanation: 'March fees: ₹3,75,000' },
+        { step: 'delta', value: 225000, unit: 'INR', explanation: 'Excess fees: ₹3,75,000 - ₹1,50,000 = ₹2,25,000' },
+        { step: 'z_score', value: 3.8, unit: 'zscore', explanation: 'Z-score: 3.80 — significant fee anomaly' },
+        { step: 'confidence', value: 0.89, unit: 'percent', explanation: '89% confidence this is not normal variability' },
+        { step: 'annual_projection', value: 2700000, unit: 'INR', explanation: 'If this repeats: ₹2,25,000 × 12 = ₹27,00,000/year' },
+      ],
+      affectedVendor: 'PayFast Payments',
+      affectedDepartment: 'Finance',
+      affectedCategory: 'Payments',
+    },
+  })
+
+  await prisma.actionLog.create({
+    data: {
+      findingId: f8.id,
+      title: 'Review PayFast fee schedule and renegotiate settlement terms',
+      description: 'Engage the payments team to review all PayFast transaction fees and negotiate a lower settlement schedule based on volume discounts.',
+      actionType: 'TICKET_CREATE',
+      status: 'AWAITING_MANAGER',
+      priority: 2,
+      approvalTier: 'MANAGER',
+      estimatedSavingMonthly: 225000,
+      estimatedSavingAnnual: 2700000,
+      dollarThreshold: 225000,
+    },
+  })
+
   console.log('✅ Seed complete.')
   console.log(`  Session 1 (TechCorp India):  ${session1.id}`)
   console.log(`  Session 2 (MegaMart):        ${session2.id}`)

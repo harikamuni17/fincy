@@ -130,6 +130,8 @@ export default function DashboardPage() {
         overspendPct: 0,
       }
 
+      window.localStorage.setItem('finci_session_id', data.sessionId)
+
       setState((prev) => ({
         ...prev,
         session: mockSession,

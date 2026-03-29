@@ -52,7 +52,7 @@ export default function SimulatePage() {
               What happens if you act?
             </h2>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              Model the financial impact of each action before approving. Drag sliders to adjust scenarios.
+              Model the financial impact of each action before approving. Review the projected savings and execution impact.
             </p>
           </div>
 

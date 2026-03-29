@@ -517,6 +517,9 @@ video {
 .collapse{
   visibility: collapse;
 }
+.static{
+  position: static;
+}
 .fixed{
   position: fixed;
 }
@@ -543,9 +546,6 @@ video {
 }
 .top-0{
   top: 0px;
-}
-.top-0\.5{
-  top: 0.125rem;
 }
 .z-30{
   z-index: 30;
@@ -700,17 +700,11 @@ video {
 .w-1\/2{
   width: 50%;
 }
-.w-10{
-  width: 2.5rem;
-}
 .w-2{
   width: 0.5rem;
 }
 .w-2\/3{
   width: 66.666667%;
-}
-.w-32{
-  width: 8rem;
 }
 .w-4{
   width: 1rem;
@@ -901,11 +895,6 @@ video {
   margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse)));
   margin-bottom: calc(1rem * var(--tw-space-y-reverse));
 }
-.space-y-5 > :not([hidden]) ~ :not([hidden]){
-  --tw-space-y-reverse: 0;
-  margin-top: calc(1.25rem * calc(1 - var(--tw-space-y-reverse)));
-  margin-bottom: calc(1.25rem * var(--tw-space-y-reverse));
-}
 .space-y-6 > :not([hidden]) ~ :not([hidden]){
   --tw-space-y-reverse: 0;
   margin-top: calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));
@@ -947,22 +936,6 @@ video {
 }
 .border{
   border-width: 1px;
-}
-.border-border-bright{
-  --tw-border-opacity: 1;
-  border-color: rgb(42 48 69 / var(--tw-border-opacity, 1));
-}
-.bg-bg-elevated{
-  --tw-bg-opacity: 1;
-  background-color: rgb(26 29 36 / var(--tw-bg-opacity, 1));
-}
-.bg-brand{
-  --tw-bg-opacity: 1;
-  background-color: rgb(0 212 170 / var(--tw-bg-opacity, 1));
-}
-.bg-white{
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
 }
 .p-10{
   padding: 2.5rem;
@@ -1195,11 +1168,6 @@ video {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
-.transition-transform{
-  transition-property: transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
 .duration-200{
   transition-duration: 200ms;
 }
@@ -1421,20 +1389,34 @@ body {
 }
 
 /* Button styles */
+button {
+  transition: transform 180ms ease, filter 180ms ease, opacity 180ms ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.01);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .btn-primary {
   background: var(--brand);
   color: #0A0B0E;
   border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 500;
+  border-radius: 10px;
+  padding: 12px 18px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: opacity 200ms ease;
+  transition: transform 180ms ease, opacity 200ms ease, background 200ms ease;
   font-family: 'DM Sans', sans-serif;
 }
 
-.btn-primary:hover { opacity: 0.85; }
+.btn-primary:hover { opacity: 0.95; }
 
 .btn-outline {
   background: transparent;

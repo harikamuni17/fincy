@@ -2,6 +2,62 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { openai, OPENAI_MODEL } from '@/lib/openai'
 
+const DEMO_CHAT_QUERY = 'why did aws costs spike?'
+const DEMO_CHAT_RESPONSE =
+  'Your AWS cloud spend spiked because of a March anomaly in on-demand infrastructure and unreserved instance usage. Fixing this issue can save roughly ₹52,000 per month.'
+
+function formatINR(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN')}`
+}
+
+function createTextStream(message: string) {
+  const encoder = new TextEncoder()
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(message))
+      controller.close()
+    },
+  })
+}
+
+function generateFallbackResponse(message: string, session: any, findings: any[], actions: any[]) {
+  const text = message.trim().toLowerCase()
+  const topFinding = findings[0]
+  const topAction = actions[0]
+
+  if (!session) {
+    if (text === DEMO_CHAT_QUERY) {
+      return DEMO_CHAT_RESPONSE
+    }
+    if (text.includes('why') && text.includes('aws')) {
+      return `AWS spend is the top issue in this demo because of an AWS bill anomaly. The likely saving opportunity is about ₹52,000 per month.`
+    }
+    return 'No active analysis session is available. Upload or load demo data first so the chat can answer your questions. For a static demo, ask: "Why did AWS costs spike?"'
+  }
+
+  if (text.includes('why') && text.includes('aws')) {
+    return `AWS is one of your largest risk areas. The top finding shows a high-priority AWS anomaly with a potential saving of ${topAction ? formatINR(topAction.estimatedSavingMonthly) : '₹0'} per month.`
+  }
+
+  if (text.includes('top') && text.includes('action')) {
+    return topAction
+      ? `The top action is ${topAction.title} with an estimated saving of ${formatINR(topAction.estimatedSavingMonthly)} per month.`
+      : 'No top action is available yet.'
+  }
+
+  if (text.includes('spend') || text.includes('waste')) {
+    return `Your current session shows total spend of ${formatINR(session.totalSpend)} and total waste identified of ${formatINR(session.totalWaste)}.`
+  }
+
+  if (text.includes('vendor')) {
+    return topFinding
+      ? `The highest risk vendor is ${topFinding.title.split(' ')[0]} with ${formatINR(topFinding.deltaAmount)} monthly excess.`
+      : 'There are no vendor-specific details available yet.'
+  }
+
+  return `I can answer basic spend questions based on the loaded session. For full AI chat, set OPENAI_API_KEY in your environment variables and reload the app.`
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
@@ -25,7 +81,13 @@ export async function POST(req: NextRequest) {
     // Fetch session data to build context
     const session = await prisma.analysisSession.findUnique({ where: { id: sessionId } })
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+      const fallbackText = generateFallbackResponse(message, null, [], [])
+      return new Response(createTextStream(fallbackText), {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-cache',
+        },
+      })
     }
 
     const [findings, actions] = await Promise.all([
@@ -81,40 +143,60 @@ Never say "I don't have access to" — you have all the data above.`
       { role: 'user', content: message },
     ]
 
-    // Streaming response
+    if (!openai) {
+      const fallbackText = generateFallbackResponse(message, session, findings, actions)
+      return new Response(createTextStream(fallbackText), {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-cache',
+        },
+      })
+    }
+
     const encoder = new TextEncoder()
+    const openaiClient = openai
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          const completion = await openai.chat.completions.create({
-            model: OPENAI_MODEL,
-            messages,
-            stream: true,
-            max_tokens: 500,
-          })
+    try {
+      const completion = await openaiClient!.chat.completions.create({
+        model: OPENAI_MODEL,
+        messages,
+        stream: true,
+        max_tokens: 500,
+      })
 
-          for await (const chunk of completion) {
-            const delta = chunk.choices[0]?.delta?.content
-            if (delta) {
-              controller.enqueue(encoder.encode(delta))
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of completion) {
+              const delta = chunk.choices[0]?.delta?.content
+              if (delta) {
+                controller.enqueue(encoder.encode(delta))
+              }
             }
+          } catch (err) {
+            controller.enqueue(encoder.encode(`\n\n[Error: ${err instanceof Error ? err.message : 'Unknown error'}]`))
+          } finally {
+            controller.close()
           }
-        } catch (err) {
-          controller.enqueue(encoder.encode(`\n\n[Error: ${err instanceof Error ? err.message : 'Unknown error'}]`))
-        } finally {
-          controller.close()
-        }
-      },
-    })
+        },
+      })
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Transfer-Encoding': 'chunked',
-        'Cache-Control': 'no-cache',
-      },
-    })
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Transfer-Encoding': 'chunked',
+          'Cache-Control': 'no-cache',
+        },
+      })
+    } catch (err) {
+      const fallbackText = generateFallbackResponse(message, session, findings, actions)
+      return new Response(createTextStream(fallbackText), {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-cache',
+        },
+      })
+    }
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

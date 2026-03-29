@@ -24,6 +24,7 @@ export default function FinciChat({ sessionId, pendingCount = 0 }: FinciChatProp
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [localSessionId, setLocalSessionId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -34,6 +35,13 @@ export default function FinciChat({ sessionId, pendingCount = 0 }: FinciChatProp
   }, [isOpen])
 
   useEffect(() => {
+    if (!sessionId) {
+      const stored = window.localStorage.getItem('finci_session_id')
+      if (stored) setLocalSessionId(stored)
+    }
+  }, [sessionId])
+
+  useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
@@ -42,12 +50,13 @@ export default function FinciChat({ sessionId, pendingCount = 0 }: FinciChatProp
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return
     const userMsg: ChatMessage = { role: 'user', content: text }
-    setMessages((prev) => [...prev, userMsg])
+    const assistantPlaceholder: ChatMessage = { role: 'assistant', content: '' }
+    const activeSessionId = sessionId ?? localSessionId ?? 'demo'
+    const historyPayload = [...messages.slice(-9), userMsg]
+
+    setMessages((prev) => [...prev, userMsg, assistantPlaceholder])
     setInput('')
     setLoading(true)
-
-    // Add placeholder for assistant
-    setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
 
     try {
       const res = await fetch('/api/chat', {
@@ -55,8 +64,8 @@ export default function FinciChat({ sessionId, pendingCount = 0 }: FinciChatProp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          sessionId: sessionId ?? 'demo',
-          history: messages.slice(-10),
+          sessionId: activeSessionId,
+          history: historyPayload,
         }),
       })
 
@@ -100,10 +109,11 @@ export default function FinciChat({ sessionId, pendingCount = 0 }: FinciChatProp
       {/* Floating button */}
       <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 50 }}>
         <button
+          type="button"
           onClick={() => setIsOpen((o) => !o)}
           style={{
-            width: 52,
-            height: 52,
+            width: 60,
+            height: 60,
             borderRadius: '50%',
             background: 'var(--brand)',
             border: 'none',
@@ -111,12 +121,18 @@ export default function FinciChat({ sessionId, pendingCount = 0 }: FinciChatProp
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 20px rgba(0,212,170,0.4)',
+            boxShadow: '0 6px 24px rgba(0,212,170,0.35)',
             position: 'relative',
-            transition: 'filter 200ms',
+            transition: 'transform 180ms ease, filter 180ms ease',
           }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.1)')}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1)')}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)'
+            e.currentTarget.style.filter = 'brightness(1.1)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.filter = 'brightness(1)'
+          }}
           aria-label="Open Finci Chat"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -311,20 +327,27 @@ export default function FinciChat({ sessionId, pendingCount = 0 }: FinciChatProp
                 }}
               />
               <button
+                type="button"
                 onClick={() => void sendMessage(input)}
                 disabled={loading || !input.trim()}
                 style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 10,
+                  width: 46,
+                  height: 46,
+                  borderRadius: 12,
                   background: input.trim() && !loading ? 'var(--brand)' : 'var(--bg-surface)',
                   border: '1px solid var(--border)',
                   cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  transition: 'background 150ms',
+                  transition: 'transform 180ms ease, background 150ms',
                   flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading && input.trim()) e.currentTarget.style.transform = 'scale(1.05)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)'
                 }}
                 aria-label="Send"
               >
